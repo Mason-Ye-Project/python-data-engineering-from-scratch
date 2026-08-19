@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "messy-orders-cleanup"
-version = "1.0.1"
+version = "1.0.2"
 description = "Synthetic beginner data-cleaning companion for Python for Data Engineering from Scratch"
 requires-python = ">=3.12"
 dependencies = [

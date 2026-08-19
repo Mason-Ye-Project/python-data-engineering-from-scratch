@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import hashlib
 import json
 import platform
@@ -12,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from messy_orders.input_contract import plan_safe_io_paths, validate_orders_csv_structure
 from messy_orders.rules import (
     CLEAN_FIELDS,
     REJECT_FIELDS,
@@ -57,37 +57,9 @@ def load_customers(path: Path) -> dict[str, dict[str, str]]:
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
-    expected_field_count = len(SOURCE_FIELDS)
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.reader(handle)
-        try:
-            header = next(reader)
-        except StopIteration as error:
-            raise ValueError("orders CSV is empty") from error
-        if tuple(header) == SOURCE_FIELDS:
-            for source_row, row in enumerate(reader, start=2):
-                if len(row) != expected_field_count:
-                    raise ValueError(
-                        f"orders CSV row {source_row} has {len(row)} fields; "
-                        f"expected {expected_field_count}"
-                    )
+    validate_orders_csv_structure(path)
 
     frame = pd.read_csv(path, dtype=str, keep_default_na=False)
-    actual_headers = tuple(str(column) for column in frame.columns)
-    missing_headers = [field for field in SOURCE_FIELDS if field not in frame.columns]
-    if missing_headers:
-        raise ValueError(f"orders CSV missing headers: {', '.join(missing_headers)}")
-    unexpected_headers = [
-        column for column in frame.columns if column not in SOURCE_FIELDS
-    ]
-    if unexpected_headers:
-        raise ValueError(
-            f"orders CSV has unexpected headers: {', '.join(unexpected_headers)}"
-        )
-    if actual_headers != SOURCE_FIELDS:
-        raise ValueError(
-            "orders CSV headers are out of order; expected: " + ", ".join(SOURCE_FIELDS)
-        )
 
     records: list[dict[str, object]] = []
     for index, row in frame.iterrows():
@@ -154,20 +126,33 @@ def write_json(payload: object, path: Path) -> None:
 def run_pipeline(
     orders_path: Path, customers_path: Path, output_dir: Path
 ) -> dict[str, object]:
-    orders_path = orders_path.resolve()
-    customers_path = customers_path.resolve()
-    output_dir = output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    inputs, output_dir, outputs = plan_safe_io_paths(
+        {"orders": orders_path, "customers": customers_path},
+        output_dir,
+        (
+            "orders_clean.csv",
+            "orders_rejected.csv",
+            "quality_report.json",
+            "run_manifest.json",
+        ),
+    )
+    orders_path = inputs["orders"]
+    customers_path = inputs["customers"]
+    input_hashes = {
+        "customers.json": sha256_file(customers_path),
+        "orders.csv": sha256_file(orders_path),
+    }
 
     customers = load_customers(customers_path)
     orders = load_orders(orders_path)
     accepted, rejected = clean_orders(orders, customers)
 
-    clean_path = output_dir / "orders_clean.csv"
-    rejected_path = output_dir / "orders_rejected.csv"
-    report_path = output_dir / "quality_report.json"
-    manifest_path = output_dir / "run_manifest.json"
+    clean_path = outputs["orders_clean.csv"]
+    rejected_path = outputs["orders_rejected.csv"]
+    report_path = outputs["quality_report.json"]
+    manifest_path = outputs["run_manifest.json"]
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     write_csv(accepted, CLEAN_FIELDS, clean_path)
     write_csv(rejected, REJECT_FIELDS, rejected_path)
 
@@ -185,10 +170,7 @@ def run_pipeline(
 
     manifest: dict[str, object] = {
         "command": "clean-orders clean",
-        "inputs": {
-            "customers.json": sha256_file(customers_path),
-            "orders.csv": sha256_file(orders_path),
-        },
+        "inputs": input_hashes,
         "outputs": {
             clean_path.name: sha256_file(clean_path),
             rejected_path.name: sha256_file(rejected_path),

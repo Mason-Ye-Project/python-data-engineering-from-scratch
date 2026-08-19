@@ -194,6 +194,61 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "row 2 has 10 fields; expected 9"):
                 load_orders(path)
 
+    def test_physically_blank_csv_lines_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                "order_id,customer_id,order_date,product,category,quantity,"
+                "unit_price,paid,notes\n\n"
+                "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok\n\n",
+                encoding="utf-8",
+            )
+            rows = load_orders(path)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["source_row"], 2)
+
+    def test_utf8_bom_header_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                "\ufefforder_id,customer_id,order_date,product,category,quantity,"
+                "unit_price,paid,notes\n"
+                "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing headers: order_id"):
+                load_orders(path)
+
+    def test_orders_input_cannot_collide_with_clean_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            orders_path = output_dir / "orders_clean.csv"
+            orders_path.write_bytes((RAW_ROOT / "orders.csv").read_bytes())
+            before = orders_path.read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "input/output path collision"):
+                run_pipeline(orders_path, RAW_ROOT / "customers.json", output_dir)
+
+            self.assertEqual(orders_path.read_bytes(), before)
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
+    def test_customers_input_cannot_collide_with_report_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            customers_path = output_dir / "quality_report.json"
+            customers_path.write_bytes((RAW_ROOT / "customers.json").read_bytes())
+            before = customers_path.read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "input/output path collision"):
+                run_pipeline(RAW_ROOT / "orders.csv", customers_path, output_dir)
+
+            self.assertEqual(customers_path.read_bytes(), before)
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
     def test_extreme_price_is_rejected_instead_of_crashing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

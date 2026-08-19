@@ -27,8 +27,8 @@ INFO cleanup complete: input=20 accepted=9 rejected=11
 
 The orders file must satisfy a structural contract before any business-rule cleaning runs, and both the standard-library example (`examples/first_cleanup.py`) and the canonical pandas workflow enforce it identically.
 
-- **Header.** The header must be exactly the declared field names, in exactly this order: `order_id`, `customer_id`, `order_date`, `product`, `category`, `quantity`, `unit_price`, `paid`, `notes`. A missing, unexpected, or reordered header fails the run with a clear message.
-- **Record width.** Every logical CSV record must contain exactly these nine fields. A record with fewer or more fields is a run-level structural failure: the run stops with a message naming the offending record and its actual field count, before any record is cleaned. This is deliberate. A short record would otherwise let a structurally broken row masquerade as a genuinely missing field, and an over-wide record would let an extra source cell be silently dropped; rejecting wrong-width records outright preserves the missing-versus-blank distinction and loses no data silently. Both implementations apply the same nine-field rule, so a file one accepts is a file the other accepts.
+- **Header.** The header must be exactly the declared field names, in exactly this order: `order_id`, `customer_id`, `order_date`, `product`, `category`, `quantity`, `unit_price`, `paid`, `notes`. A missing, unexpected, or reordered header fails the run with a clear message. A UTF-8 byte-order mark is not stripped and therefore does not satisfy the exact first field name.
+- **Blank physical lines and record width.** A physically empty line is not a logical CSV record and is ignored. Every non-empty logical CSV record must contain exactly the nine declared fields. A record with fewer or more fields is a run-level structural failure: the run stops with a message naming the offending logical record and its actual field count, before any record is cleaned. This is deliberate. A short record would otherwise let a structurally broken row masquerade as a genuinely missing field, and an over-wide record would let an extra source cell be silently dropped; rejecting wrong-width records outright preserves the missing-versus-blank distinction and loses no data silently. Both implementations call the same structural preflight, so they apply the same header, blank-line, and width policies and a file one accepts is a file the other accepts.
 - **Customer reference.** The customer file must be a JSON array of customer objects, each with a non-empty string `customer_id`, a non-empty string `customer_name`, and a `contact` object whose `city` is a string. If two customers share the same `customer_id`, the loader stops with a clear error naming the duplicate id rather than allowing a later object to overwrite an earlier one. Both implementations reject duplicate customer ids the same way.
 
 `source_row` is the logical CSV-record ordinal, with the header treated as position one; it is not guaranteed to equal a physical text-file line when valid CSV contains blank physical lines or embedded newlines. Under the nine-field contract, a structurally well-formed record's fields all arrive as strings; the contract exists precisely so that ragged records, which a CSV reader can otherwise represent with `None` or an extra list, are refused before cleaning rather than misread.
@@ -44,7 +44,7 @@ The workflow writes four files into the output directory, using two mechanisms:
 
 The two CSV files are therefore pandas writes, and the two JSON files are standard-library JSON writes.
 
-Raw input files are read-only and are never overwritten. An identical rerun on the same runtime reproduces the clean, rejected, and report files byte for byte; the manifest additionally records the observed runtime versions and so may legitimately differ across runtimes. Byte-for-byte identity across different machines or operating systems is not claimed.
+Raw input files are read-only and are never overwritten. Before any output write, the program resolves all input and planned output paths, rejects every input/output collision (including resolved symbolic-link aliases), and freezes both input hashes. An identical rerun on the same runtime reproduces the clean, rejected, and report files byte for byte; the manifest additionally records the observed runtime versions and so may legitimately differ across runtimes. Byte-for-byte identity across different machines or operating systems is not claimed.
 
 ## Duplicate contract
 
@@ -73,7 +73,7 @@ Required blank fields, invalid values, and unknown customer references are rejec
 The companion's test suite runs on both verified runtimes and passes:
 
 ```text
-Ran 25 tests
+Ran 32 tests
 
 OK
 ```

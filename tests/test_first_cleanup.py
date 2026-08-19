@@ -15,6 +15,7 @@ EXAMPLE_MODULE = importlib.util.module_from_spec(EXAMPLE_SPEC)
 EXAMPLE_SPEC.loader.exec_module(EXAMPLE_MODULE)
 load_customers = EXAMPLE_MODULE.load_customers
 load_orders = EXAMPLE_MODULE.load_orders
+run = EXAMPLE_MODULE.run
 
 
 HEADER = (
@@ -63,3 +64,58 @@ class FirstCleanupInputTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "row 2 has 10 fields; expected 9"):
                 load_orders(path)
+
+    def test_physically_blank_csv_lines_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                HEADER
+                + "\nORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok\n\n",
+                encoding="utf-8",
+            )
+            rows = load_orders(path)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["source_row"], 2)
+
+    def test_utf8_bom_header_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                "\ufeff" + HEADER
+                + "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing headers: order_id"):
+                load_orders(path)
+
+    def test_orders_input_cannot_collide_with_first_clean_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            orders_path = output_dir / "first_clean.csv"
+            orders_path.write_text(
+                HEADER
+                + "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok\n",
+                encoding="utf-8",
+            )
+            customers_path = root / "customers.json"
+            customers_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "customer_id": "C001",
+                            "customer_name": "Example Customer",
+                            "contact": {"city": "Example Bay"},
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            before = orders_path.read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "input/output path collision"):
+                run(orders_path, customers_path, output_dir)
+
+            self.assertEqual(orders_path.read_bytes(), before)
+            self.assertFalse((output_dir / "first_rejected.csv").exists())

@@ -6,19 +6,19 @@ Everything here uses only synthetic, made-up data. There is no database, cloud a
 
 ## Getting this companion
 
-This project is version 1.0.1. The primary way to obtain it is the versioned release, which is the version the book was written against:
+This project is version 1.0.2. The primary way to obtain it is the versioned release, which is the version the book was written against:
 
 ```text
-https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.1-book
+https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.2-book
 ```
 
-On that release page, download the companion archive named `Python_for_Data_Engineering_from_Scratch_Companion_v1.0.1.zip` and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
+On that release page, download the companion archive named `Python_for_Data_Engineering_from_Scratch_Companion_v1.0.2.zip` and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
 
 ```text
 https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch
 ```
 
-Prefer the versioned release when following the book: it is the 1.0.1 version the book's commands, outputs, and counts were verified against, so following along against it gives you the results shown in these pages.
+Prefer the versioned release when following the book: it is the 1.0.2 version the book's commands, outputs, and counts were verified against, so following along against it gives you the results shown in these pages.
 
 ## What you need
 
@@ -53,7 +53,7 @@ On Windows PowerShell:
 .venv\Scripts\Activate.ps1
 ```
 
-When activation works, your prompt usually shows a `(.venv)` marker. Activation lasts only for the current terminal session, so if you open a new terminal you will need to move into the project and activate again.
+When activation works, your prompt may show a `(.venv)` marker. Activation lasts only for the current terminal session, so if you open a new terminal you will need to move into the project and activate again.
 
 Install the project:
 
@@ -63,7 +63,7 @@ python -m pip install .
 
 ## Quick smoke test (optional first run)
 
-Before the full workflow, you can run a small standard-library script to confirm your setup works. This early script uses only Python's built-in tools and cleans the same data in a simplified way, so a successful run means Python, your working directory, and the raw files are all in order.
+Before the full workflow, you can run a small standard-library script to confirm that the interpreter you invoked can import the installed companion and read the specified raw files. This early script uses only Python's built-in tools and cleans the same data in a simplified way.
 
 With the environment active, run:
 
@@ -106,7 +106,7 @@ python -m unittest discover -s tests -v
 When everything passes, the run ends with:
 
 ```text
-Ran 25 tests
+Ran 32 tests
 
 OK
 ```
@@ -115,7 +115,7 @@ A passing suite is bounded evidence that the tested behaviors, on the tested inp
 
 ## Input structure the loader requires
 
-Both the standard-library example and the canonical `clean-orders` workflow hold the orders file to an exact structural contract before any business-rule cleaning runs. The header must be exactly the declared nine field names, in the declared order. Every data record must then contain exactly nine fields: a record with too few or too many fields is a run-level structural failure, and the run stops with a clear message naming the offending record and its field count, rather than silently collapsing a missing cell or discarding an extra one. Both implementations enforce this same nine-field rule, so a file one accepts is a file the other accepts. This structural check is deliberately separate from, and earlier than, the per-record business rules that reject an individual row for a blank required value, an invalid format, or an unknown customer.
+Both the standard-library example and the canonical `clean-orders` workflow call the same structural preflight before any business-rule cleaning runs. The header must be exactly the declared nine field names, in the declared order; a UTF-8 byte-order mark is not silently stripped and therefore does not satisfy that exact header contract. Every data record must then contain exactly nine fields: a record with too few or too many fields is a run-level structural failure, and the run stops with a clear message naming the offending logical record and its field count, rather than silently collapsing a missing cell or discarding an extra one. A physically empty line is not a logical CSV record and is ignored by both loaders. Both implementations therefore apply the same header, blank-line, and nine-field policies, so a file one accepts is a file the other accepts. This structural check is deliberately separate from, and earlier than, the per-record business rules that reject an individual row for a blank required value, an invalid format, or an unknown customer.
 
 The customer reference file is held to a matching standard: if it contains two customers with the same `customer_id`, the loader stops with a clear error naming the duplicate id rather than silently letting one overwrite the other. Both implementations reject duplicate customer ids the same way.
 
@@ -134,7 +134,7 @@ A content hash here is a short string computed from a file's exact bytes; it is 
 
 ## Raw data is never overwritten
 
-The two input files, `data/raw/orders.csv` and `data/raw/customers.json`, are the source of truth and are read only. The workflow reads them and writes all of its results into the separate output directory; it never writes over the raw inputs. If you delete the output directory, you can always regenerate it by running the command again from the untouched raw files. If you want to experiment with the input, copy it somewhere else first and change the copy, leaving the raw files intact. Note that the cleaning transformations themselves (whitespace collapsing, uppercasing identifiers, lowercasing categories, two-decimal rounding) are one-way; what makes a cleaning decision recoverable is that the raw file is preserved, not that the transformation can be reversed.
+The two input files, `data/raw/orders.csv` and `data/raw/customers.json`, are the source of truth and are read only. Before writing anything, each workflow resolves every input path and every planned output path and stops with an `input/output path collision` error if any input would also be an output, including when a symbolic-link alias resolves to the same location. The canonical workflow also freezes both input hashes before it writes its first output. It therefore never writes over a raw input or records an output's replacement bytes as an input identity. If you delete the output directory, you can regenerate it by running the command again from the untouched raw files. If you want to experiment with the input, copy it somewhere else first and change the copy, leaving the raw files intact. Note that the cleaning transformations themselves (whitespace collapsing, uppercasing identifiers, lowercasing categories, two-decimal rounding) are one-way; what makes a cleaning decision recoverable is that the raw file is preserved, not that the transformation can be reversed.
 
 ## Reproducibility
 
@@ -142,10 +142,10 @@ Running the command twice on the same data and the same runtime produces byte-fo
 
 ## Troubleshooting
 
-- **"No such file or directory" for an input file.** You are probably running from the wrong directory. Confirm where you are with `pwd` (macOS or Linux) or `Get-Location` (Windows PowerShell), and move into this project directory before running the command.
+- **"No such file or directory" for an input file.** Check the working directory first with `pwd` (macOS or Linux) or `Get-Location` (Windows PowerShell), and move into this project directory before running the command. If the directory is correct, verify the input path and filename next.
 - **`python` not found, or the wrong version.** Try `python3` instead, and use that name throughout. If you have no suitable version, install CPython 3.12 or newer from python.org.
-- **pandas seems to be missing.** The virtual environment is probably not active. Look for the `(.venv)` marker on your prompt; if it is absent, activate the environment again with the command for your system and rerun.
-- **PowerShell blocks the activation script on Windows.** This is a common first-time issue. PowerShell's own documentation describes adjusting the execution policy to allow local scripts for your user account; apply that and activate again.
+- **pandas seems to be missing.** One possible cause is that the command invoked an interpreter where the companion is not installed. Check which interpreter the command uses, activate the intended environment if needed, run `python -m pip install .` there, and rerun.
+- **PowerShell blocks the activation script on Windows.** PowerShell's own documentation describes adjusting the execution policy to allow local scripts for your user account; follow that guidance and activate again.
 - **The counts are not 20, 9, and 11.** Confirm you are running against the unmodified raw files in `data/raw`, not an altered copy.
 - **The run stops complaining a record has the wrong number of fields.** That is the nine-field structural check. Look at the record number it names in `data/raw/orders.csv` and confirm the file has not been edited into a short or over-wide row.
 

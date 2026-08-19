@@ -7,10 +7,10 @@ import csv
 import json
 from pathlib import Path
 
+from messy_orders.input_contract import plan_safe_io_paths, validate_orders_csv_structure
 from messy_orders.rules import (
     CLEAN_FIELDS,
     REJECT_FIELDS,
-    SOURCE_FIELDS,
     source_rejection,
     validate_and_clean_order,
 )
@@ -44,23 +44,12 @@ def load_customers(path: Path) -> dict[str, dict[str, str]]:
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
+    validate_orders_csv_structure(path)
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        if tuple(reader.fieldnames or ()) != SOURCE_FIELDS:
-            raise ValueError("orders CSV headers do not match the companion contract")
         rows: list[dict[str, object]] = []
         # This is a logical CSV-record ordinal. The header occupies position 1.
         for source_row, row in enumerate(reader, start=2):
-            extra_values = row.get(None)
-            present_fields = sum(row.get(field) is not None for field in SOURCE_FIELDS)
-            actual_field_count = present_fields + (
-                len(extra_values) if isinstance(extra_values, list) else 0
-            )
-            if actual_field_count != len(SOURCE_FIELDS):
-                raise ValueError(
-                    f"orders CSV row {source_row} has {actual_field_count} fields; "
-                    f"expected {len(SOURCE_FIELDS)}"
-                )
             row["source_row"] = source_row
             rows.append(row)
     return rows
@@ -78,6 +67,13 @@ def write_rows(
 def run(
     orders_path: Path, customers_path: Path, output_dir: Path
 ) -> tuple[int, int, int]:
+    inputs, output_dir, outputs = plan_safe_io_paths(
+        {"orders": orders_path, "customers": customers_path},
+        output_dir,
+        ("first_clean.csv", "first_rejected.csv"),
+    )
+    orders_path = inputs["orders"]
+    customers_path = inputs["customers"]
     customers = load_customers(customers_path)
     orders = load_orders(orders_path)
 
@@ -110,8 +106,8 @@ def run(
     accepted.sort(key=lambda row: int(row["source_row"]))
     rejected.sort(key=lambda row: int(row["source_row"]))
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_rows(output_dir / "first_clean.csv", CLEAN_FIELDS, accepted)
-    write_rows(output_dir / "first_rejected.csv", REJECT_FIELDS, rejected)
+    write_rows(outputs["first_clean.csv"], CLEAN_FIELDS, accepted)
+    write_rows(outputs["first_rejected.csv"], REJECT_FIELDS, rejected)
     return len(orders), len(accepted), len(rejected)
 
 
