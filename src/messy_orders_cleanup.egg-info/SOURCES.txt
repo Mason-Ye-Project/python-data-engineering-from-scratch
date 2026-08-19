@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+src/messy_orders/__init__.py
+src/messy_orders/__main__.py
+src/messy_orders/cli.py
+src/messy_orders/pipeline.py
+src/messy_orders/rules.py
+src/messy_orders_cleanup.egg-info/PKG-INFO
+src/messy_orders_cleanup.egg-info/SOURCES.txt
+src/messy_orders_cleanup.egg-info/dependency_links.txt
+src/messy_orders_cleanup.egg-info/entry_points.txt
+src/messy_orders_cleanup.egg-info/requires.txt
+src/messy_orders_cleanup.egg-info/top_level.txt
+tests/test_pipeline.py
+tests/test_rules.py

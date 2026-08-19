@@ -1,0 +1,18 @@
+{
+  "accepted_rows": 9,
+  "input_rows": 20,
+  "reason_counts": {
+    "blank_order_date": 1,
+    "blank_order_id": 1,
+    "blank_product": 1,
+    "blank_quantity": 1,
+    "duplicate_order_id_superseded": 1,
+    "invalid_category": 1,
+    "invalid_order_date": 1,
+    "invalid_paid": 1,
+    "invalid_unit_price": 1,
+    "nonpositive_quantity": 1,
+    "unknown_customer_id": 1
+  },
+  "rejected_rows": 11
+}

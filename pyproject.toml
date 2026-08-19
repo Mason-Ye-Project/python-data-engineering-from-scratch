@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "messy-orders-cleanup"
+version = "1.0.0"
+description = "Synthetic beginner data-cleaning companion for Python for Data Engineering from Scratch"
+requires-python = ">=3.12"
+dependencies = [
+  "pandas==3.0.5",
+]
+
+[project.scripts]
+clean-orders = "messy_orders.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

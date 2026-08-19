@@ -1,0 +1,34 @@
+[
+  {
+    "customer_id": "C001",
+    "customer_name": "Avery Chen",
+    "contact": {
+      "email": "avery.chen@example.com",
+      "city": "Example Bay"
+    }
+  },
+  {
+    "customer_id": "C002",
+    "customer_name": "Morgan Diaz",
+    "contact": {
+      "email": "morgan.diaz@example.com",
+      "city": "Sample Ridge"
+    }
+  },
+  {
+    "customer_id": "C003",
+    "customer_name": "Riley Singh",
+    "contact": {
+      "email": "riley.singh@example.com",
+      "city": "Demo Point"
+    }
+  },
+  {
+    "customer_id": "C004",
+    "customer_name": "Jordan Lee",
+    "contact": {
+      "email": "jordan.lee@example.com",
+      "city": "Test Harbor"
+    }
+  }
+]

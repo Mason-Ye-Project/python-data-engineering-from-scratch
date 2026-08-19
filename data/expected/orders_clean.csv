@@ -1,0 +1,10 @@
+order_id,customer_id,order_date,product,category,quantity,unit_price,paid,notes,customer_name,customer_city,source_row
+ORD-1001,C001,2026-07-01,Notebook,stationery,2,4.50,true,First order,Avery Chen,Example Bay,2
+ORD-1002,C002,2026-07-01,Water Bottle,home,1,12.00,true,,Morgan Diaz,Sample Ridge,3
+ORD-1010,C004,2026-07-04,Coffee Mug,home,1,9.50,true,category alias,Jordan Lee,Test Harbor,11
+ORD-1011,C001,2026-07-04,Keyboard,electronics,1,49.95,true,,Avery Chen,Example Bay,12
+ORD-1012,C002,2026-07-05,Notebook,stationery,6,4.50,false,later correction,Morgan Diaz,Sample Ridge,14
+ORD-1013,C003,2026-07-05,Pen Set,stationery,2,5.25,false,,Riley Singh,Demo Point,15
+ORD-1014,C004,2026-07-06,Desk Organizer,office,2,18.75,true,,Jordan Lee,Test Harbor,16
+ORD-1015,C001,2026-07-06,USB Hub,electronics,1,29.99,true,trim paid,Avery Chen,Example Bay,17
+ORD-1019,C001,2026-07-08,Notebook,stationery,2,4.50,true,"New, customer",Avery Chen,Example Bay,21

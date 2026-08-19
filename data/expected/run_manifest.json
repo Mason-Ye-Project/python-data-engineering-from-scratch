@@ -1,0 +1,16 @@
+{
+  "command": "clean-orders clean",
+  "inputs": {
+    "customers.json": "5086b4cce303f0aa70beaac1369c05d39078a756a64b3f566dcb4167bee31049",
+    "orders.csv": "f6c23d3831f3b7db8cc72b1e49ecd1e28270ad6e773c3c33952a7fc67fc33508"
+  },
+  "outputs": {
+    "orders_clean.csv": "1116336048c82187fc462f49b997cf5fb2f992ff48057b953e634408fdcbd7c6",
+    "orders_rejected.csv": "c9992efb678787c40eda20cc85f310d4902997d3e0a01477a8a5230ae989db19",
+    "quality_report.json": "c0a3d265dd333faf2636189496026cc475b25c7248988806a6fa37b9b72ba6a0"
+  },
+  "runtime": {
+    "pandas": "3.0.5",
+    "python": "3.12.6"
+  }
+}
