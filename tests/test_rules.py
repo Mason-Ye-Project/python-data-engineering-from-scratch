@@ -11,9 +11,7 @@ from messy_orders.rules import (
     validate_and_clean_order,
 )
 
-CUSTOMERS = {
-    "C001": {"customer_name": "Avery Chen", "customer_city": "Example Bay"}
-}
+CUSTOMERS = {"C001": {"customer_name": "Avery Chen", "customer_city": "Example Bay"}}
 
 
 def valid_source() -> dict[str, object]:
@@ -85,9 +83,7 @@ class RuleTests(unittest.TestCase):
         missing_source = valid_source()
         del missing_source["product"]
 
-        blank_cleaned, blank_reasons = validate_and_clean_order(
-            blank_source, CUSTOMERS
-        )
+        blank_cleaned, blank_reasons = validate_and_clean_order(blank_source, CUSTOMERS)
         missing_cleaned, missing_reasons = validate_and_clean_order(
             missing_source, CUSTOMERS
         )

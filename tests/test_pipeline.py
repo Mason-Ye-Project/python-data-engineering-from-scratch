@@ -170,6 +170,30 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "out of order"):
                 load_orders(path)
 
+    def test_short_csv_record_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                "order_id,customer_id,order_date,product,category,quantity,"
+                "unit_price,paid,notes\n"
+                "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "row 2 has 8 fields; expected 9"):
+                load_orders(path)
+
+    def test_extra_csv_field_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "orders.csv"
+            path.write_text(
+                "order_id,customer_id,order_date,product,category,quantity,"
+                "unit_price,paid,notes\n"
+                "ORD-9001,C001,2026-07-01,Notebook,stationery,1,4.50,yes,ok,extra\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "row 2 has 10 fields; expected 9"):
+                load_orders(path)
+
     def test_extreme_price_is_rejected_instead_of_crashing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

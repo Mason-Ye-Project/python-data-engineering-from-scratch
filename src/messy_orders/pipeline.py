@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import platform
@@ -56,18 +57,36 @@ def load_customers(path: Path) -> dict[str, dict[str, str]]:
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
+    expected_field_count = len(SOURCE_FIELDS)
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except StopIteration as error:
+            raise ValueError("orders CSV is empty") from error
+        if tuple(header) == SOURCE_FIELDS:
+            for source_row, row in enumerate(reader, start=2):
+                if len(row) != expected_field_count:
+                    raise ValueError(
+                        f"orders CSV row {source_row} has {len(row)} fields; "
+                        f"expected {expected_field_count}"
+                    )
+
     frame = pd.read_csv(path, dtype=str, keep_default_na=False)
     actual_headers = tuple(str(column) for column in frame.columns)
     missing_headers = [field for field in SOURCE_FIELDS if field not in frame.columns]
     if missing_headers:
         raise ValueError(f"orders CSV missing headers: {', '.join(missing_headers)}")
-    unexpected_headers = [column for column in frame.columns if column not in SOURCE_FIELDS]
+    unexpected_headers = [
+        column for column in frame.columns if column not in SOURCE_FIELDS
+    ]
     if unexpected_headers:
-        raise ValueError(f"orders CSV has unexpected headers: {', '.join(unexpected_headers)}")
+        raise ValueError(
+            f"orders CSV has unexpected headers: {', '.join(unexpected_headers)}"
+        )
     if actual_headers != SOURCE_FIELDS:
         raise ValueError(
-            "orders CSV headers are out of order; expected: "
-            + ", ".join(SOURCE_FIELDS)
+            "orders CSV headers are out of order; expected: " + ", ".join(SOURCE_FIELDS)
         )
 
     records: list[dict[str, object]] = []
@@ -96,8 +115,7 @@ def clean_orders(
             valid_candidates.append(clean_row)
 
     last_row_for_order = {
-        str(row["order_id"]): int(row["source_row"])
-        for row in valid_candidates
+        str(row["order_id"]): int(row["source_row"]) for row in valid_candidates
     }
 
     accepted: list[dict[str, object]] = []
@@ -118,7 +136,9 @@ def clean_orders(
     return accepted, rejected
 
 
-def write_csv(rows: list[dict[str, object]], fields: tuple[str, ...], path: Path) -> None:
+def write_csv(
+    rows: list[dict[str, object]], fields: tuple[str, ...], path: Path
+) -> None:
     frame = pd.DataFrame(rows, columns=fields)
     frame.to_csv(path, index=False, lineterminator="\n")
 
@@ -131,7 +151,9 @@ def write_json(payload: object, path: Path) -> None:
     )
 
 
-def run_pipeline(orders_path: Path, customers_path: Path, output_dir: Path) -> dict[str, object]:
+def run_pipeline(
+    orders_path: Path, customers_path: Path, output_dir: Path
+) -> dict[str, object]:
     orders_path = orders_path.resolve()
     customers_path = customers_path.resolve()
     output_dir = output_dir.resolve()

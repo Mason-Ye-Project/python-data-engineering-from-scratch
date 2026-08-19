@@ -6,26 +6,30 @@ Everything here uses only synthetic, made-up data. There is no database, cloud a
 
 ## Getting this companion
 
-This project is version 1.0.0. The primary way to obtain it is the pinned release, which is the exact version the book was written against:
+This project is version 1.0.1. The primary way to obtain it is the versioned release, which is the version the book was written against:
 
 ```text
-https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.0-book
+https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.1-book
 ```
 
-Download the companion archive from that release and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
+On that release page, download the companion archive named `Python_for_Data_Engineering_from_Scratch_Companion_v1.0.1.zip` and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
 
 ```text
 https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch
 ```
 
-Prefer the pinned release when following the book, because a pinned release does not move: its files are the 1.0.0 version the book's commands, outputs, and counts were verified against.
+Prefer the versioned release when following the book: it is the 1.0.1 version the book's commands, outputs, and counts were verified against, so following along against it gives you the results shown in these pages.
 
 ## What you need
 
 - CPython 3.12 or newer. Check yours by running `python --version` (or `python3 --version` if `python` is not found), and use whichever command works wherever these instructions write `python`.
-- An internet connection the first time you install, so the one dependency, pandas, can be downloaded.
+- An internet connection the first time you install, so the dependency can be downloaded.
 
 Read the version facts as two separate statements. The package metadata requires CPython 3.12 or newer; that is the minimum the installer enforces. Separately, the companion was verified on CPython 3.12.6 and CPython 3.14.6, each with pandas 3.0.5; those are the exact runtimes it was actually run and checked on. The requirement is not a promise that every later Python or pandas release behaves identically, because only those two versions were verified.
+
+## Dependencies
+
+The companion has exactly one runtime dependency: pandas, pinned to version 3.0.5. That is the only third-party package the program itself imports when it runs. When you install the project into a fresh virtual environment, pip may also briefly fetch the small build tooling the project declares (for example, a recent `setuptools`) in order to build and install the local package; that build tooling is separate from the single runtime dependency and is used only during installation, not when the workflow runs.
 
 ## Set up
 
@@ -102,21 +106,29 @@ python -m unittest discover -s tests -v
 When everything passes, the run ends with:
 
 ```text
-Ran 20 tests
+Ran 25 tests
 
 OK
 ```
 
-A passing suite is bounded evidence that the tested behaviors, on the tested inputs, worked as expected. It is not proof that all possible data defects are caught.
+A passing suite is bounded evidence that the tested behaviors, on the tested inputs, worked as expected. It is not proof that all possible data defects are caught. The end-to-end test makes several assertions together, checking the input, accepted, and rejected totals, the full table of reason counts, and specific surviving and superseded rows; the canonical fixture exercises eleven of the twenty-six declared reason codes, so the suite does not directly exercise all twenty-six.
+
+## Input structure the loader requires
+
+Both the standard-library example and the canonical `clean-orders` workflow hold the orders file to an exact structural contract before any business-rule cleaning runs. The header must be exactly the declared nine field names, in the declared order. Every data record must then contain exactly nine fields: a record with too few or too many fields is a run-level structural failure, and the run stops with a clear message naming the offending record and its field count, rather than silently collapsing a missing cell or discarding an extra one. Both implementations enforce this same nine-field rule, so a file one accepts is a file the other accepts. This structural check is deliberately separate from, and earlier than, the per-record business rules that reject an individual row for a blank required value, an invalid format, or an unknown customer.
+
+The customer reference file is held to a matching standard: if it contains two customers with the same `customer_id`, the loader stops with a clear error naming the duplicate id rather than silently letting one overwrite the other. Both implementations reject duplicate customer ids the same way.
 
 ## What the workflow writes
 
-The command writes four files into the output directory you name (`data/out` above). Each has a distinct role:
+The command writes four files into the output directory you name (`data/out` above). Each has a distinct role, and the program writes them with two different mechanisms:
 
-- `orders_clean.csv` holds the accepted, normalized records, in a standard form with the customer's name and city attached.
-- `orders_rejected.csv` holds every rejected row, preserved with its original values and a reason code explaining why it was rejected. Together with the clean file, this accounts for all twenty input rows.
-- `quality_report.json` holds bounded counts: the input, accepted, and rejected totals, and how many times each rejection reason occurred.
-- `run_manifest.json` records the run. It contains the command name (`clean-orders clean`), the observed runtime versions of Python and pandas, the content hashes of the two input files (`orders.csv` and `customers.json`), and the content hashes of the three non-manifest output files (`orders_clean.csv`, `orders_rejected.csv`, and `quality_report.json`). It does not hash itself, because a file cannot contain its own final hash, and it records the command name rather than the full argument line.
+- `orders_clean.csv` holds the accepted, normalized records, in a standard form with the customer's name and city attached. It is written by pandas with `DataFrame.to_csv`.
+- `orders_rejected.csv` holds every rejected row, preserved with its original values and a reason code explaining why it was rejected. Together with the clean file, this accounts for all twenty input rows. It is also written by pandas with `DataFrame.to_csv`.
+- `quality_report.json` holds bounded counts: the input, accepted, and rejected totals, and how many times each rejection reason occurred. It is written not through pandas but by serializing a plain Python dictionary with `json.dumps` and writing the text with `Path.write_text`.
+- `run_manifest.json` records the run. It contains the command name (`clean-orders clean`), the observed runtime versions of Python and pandas, the content hashes of the two input files (`orders.csv` and `customers.json`), and the content hashes of the three non-manifest output files (`orders_clean.csv`, `orders_rejected.csv`, and `quality_report.json`). Like the report, it is written with `json.dumps` and `Path.write_text`. It does not hash itself, because a file cannot contain its own final hash, and it records the command name rather than the full argument line.
+
+So the two CSV files come from pandas, and the two JSON files come from standard-library JSON serialization; neither JSON file passes through pandas.
 
 A content hash here is a short string computed from a file's exact bytes; it is a collision-resistant fingerprint, not a mathematical one-to-one proof, so it is extremely unlikely, rather than impossible in principle, for two different files to share one. That is enough to make comparing hashes a reliable, quick way to check whether two files are byte-for-byte the same.
 
@@ -135,6 +147,7 @@ Running the command twice on the same data and the same runtime produces byte-fo
 - **pandas seems to be missing.** The virtual environment is probably not active. Look for the `(.venv)` marker on your prompt; if it is absent, activate the environment again with the command for your system and rerun.
 - **PowerShell blocks the activation script on Windows.** This is a common first-time issue. PowerShell's own documentation describes adjusting the execution policy to allow local scripts for your user account; apply that and activate again.
 - **The counts are not 20, 9, and 11.** Confirm you are running against the unmodified raw files in `data/raw`, not an altered copy.
+- **The run stops complaining a record has the wrong number of fields.** That is the nine-field structural check. Look at the record number it names in `data/raw/orders.csv` and confirm the file has not been edited into a short or over-wide row.
 
 ## Limitations
 

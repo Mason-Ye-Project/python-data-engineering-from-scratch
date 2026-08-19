@@ -18,13 +18,29 @@ from messy_orders.rules import (
 
 def load_customers(path: Path) -> dict[str, dict[str, str]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return {
-        customer["customer_id"]: {
+    if not isinstance(payload, list):
+        raise ValueError("customers JSON must contain an array")
+
+    customers: dict[str, dict[str, str]] = {}
+    for customer in payload:
+        if not isinstance(customer, dict):
+            raise ValueError("each customer must be a JSON object")
+        customer_id = customer.get("customer_id")
+        customer_name = customer.get("customer_name")
+        contact = customer.get("contact")
+        if not isinstance(customer_id, str) or not customer_id:
+            raise ValueError("each customer requires customer_id text")
+        if not isinstance(customer_name, str) or not customer_name:
+            raise ValueError(f"customer {customer_id} requires customer_name text")
+        if not isinstance(contact, dict) or not isinstance(contact.get("city"), str):
+            raise ValueError(f"customer {customer_id} requires contact.city text")
+        if customer_id in customers:
+            raise ValueError(f"duplicate customer_id: {customer_id}")
+        customers[customer_id] = {
             "customer_name": customer["customer_name"],
             "customer_city": customer["contact"]["city"],
         }
-        for customer in payload
-    }
+    return customers
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
@@ -35,19 +51,33 @@ def load_orders(path: Path) -> list[dict[str, object]]:
         rows: list[dict[str, object]] = []
         # This is a logical CSV-record ordinal. The header occupies position 1.
         for source_row, row in enumerate(reader, start=2):
+            extra_values = row.get(None)
+            present_fields = sum(row.get(field) is not None for field in SOURCE_FIELDS)
+            actual_field_count = present_fields + (
+                len(extra_values) if isinstance(extra_values, list) else 0
+            )
+            if actual_field_count != len(SOURCE_FIELDS):
+                raise ValueError(
+                    f"orders CSV row {source_row} has {actual_field_count} fields; "
+                    f"expected {len(SOURCE_FIELDS)}"
+                )
             row["source_row"] = source_row
             rows.append(row)
     return rows
 
 
-def write_rows(path: Path, fields: tuple[str, ...], rows: list[dict[str, object]]) -> None:
+def write_rows(
+    path: Path, fields: tuple[str, ...], rows: list[dict[str, object]]
+) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
 
-def run(orders_path: Path, customers_path: Path, output_dir: Path) -> tuple[int, int, int]:
+def run(
+    orders_path: Path, customers_path: Path, output_dir: Path
+) -> tuple[int, int, int]:
     customers = load_customers(customers_path)
     orders = load_orders(orders_path)
 
@@ -63,8 +93,7 @@ def run(orders_path: Path, customers_path: Path, output_dir: Path) -> tuple[int,
             valid_candidates.append(cleaned)
 
     last_row_for_order = {
-        str(row["order_id"]): int(row["source_row"])
-        for row in valid_candidates
+        str(row["order_id"]): int(row["source_row"]) for row in valid_candidates
     }
     accepted: list[dict[str, object]] = []
     for row in valid_candidates:
@@ -97,10 +126,7 @@ def main() -> int:
         args.customers,
         args.output_dir,
     )
-    print(
-        f"input={input_rows} accepted={accepted_rows} "
-        f"rejected={rejected_rows}"
-    )
+    print(f"input={input_rows} accepted={accepted_rows} " f"rejected={rejected_rows}")
     return 0
 
 

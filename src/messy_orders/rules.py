@@ -57,9 +57,7 @@ def clean_text(value: object) -> str:
     return " ".join(str(value).strip().split())
 
 
-def required_text_state(
-    source: Mapping[str, object], field: str
-) -> tuple[str, str]:
+def required_text_state(source: Mapping[str, object], field: str) -> tuple[str, str]:
     """Return missing, blank, or present plus normalized text for a field."""
 
     if field not in source or source[field] is None:
@@ -221,7 +219,9 @@ def validate_and_clean_order(
     return clean_row, []
 
 
-def source_rejection(source: Mapping[str, object], reasons: list[str]) -> dict[str, object]:
+def source_rejection(
+    source: Mapping[str, object], reasons: list[str]
+) -> dict[str, object]:
     rejected: dict[str, object] = {"source_row": int(source["source_row"])}
     for field in SOURCE_FIELDS:
         raw_value = source.get(field)

@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: messy-orders-cleanup
-Version: 1.0.0
-Summary: Synthetic beginner data-cleaning companion for Python for Data Engineering from Scratch
-Requires-Python: >=3.12
-License-File: LICENSE
-Requires-Dist: pandas==3.0.5
-Dynamic: license-file

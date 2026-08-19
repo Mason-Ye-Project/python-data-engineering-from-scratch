@@ -1,2 +1,0 @@
-[console_scripts]
-clean-orders = messy_orders.cli:main
