@@ -11,11 +11,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from messy_orders.input_contract import plan_safe_io_paths, validate_orders_csv_structure
+from messy_orders.input_contract import (
+    load_orders_csv_records,
+    load_strict_json,
+    plan_safe_io_paths,
+)
 from messy_orders.rules import (
     CLEAN_FIELDS,
     REJECT_FIELDS,
-    SOURCE_FIELDS,
     source_rejection,
     validate_and_clean_order,
 )
@@ -30,7 +33,7 @@ def sha256_file(path: Path) -> str:
 
 
 def load_customers(path: Path) -> dict[str, dict[str, str]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = load_strict_json(path)
     if not isinstance(payload, list):
         raise ValueError("customers JSON must contain an array")
 
@@ -57,17 +60,7 @@ def load_customers(path: Path) -> dict[str, dict[str, str]]:
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
-    validate_orders_csv_structure(path)
-
-    frame = pd.read_csv(path, dtype=str, keep_default_na=False)
-
-    records: list[dict[str, object]] = []
-    for index, row in frame.iterrows():
-        record = {field: row[field] for field in SOURCE_FIELDS}
-        # This is a logical CSV-record ordinal. The header occupies position 1.
-        record["source_row"] = int(index) + 2
-        records.append(record)
-    return records
+    return load_orders_csv_records(path)
 
 
 def clean_orders(

@@ -6,19 +6,19 @@ Everything here uses only synthetic, made-up data. There is no database, cloud a
 
 ## Getting this companion
 
-This project is version 1.0.2. The primary way to obtain it is the versioned release, which is the version the book was written against:
+This project is version 1.0.3. The primary way to obtain it is the versioned release, which is the version the book was written against:
 
 ```text
-https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.2-book
+https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch/releases/tag/v1.0.3-book
 ```
 
-On that release page, download the companion archive named `Python_for_Data_Engineering_from_Scratch_Companion_v1.0.2.zip` and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
+On that release page, download the companion archive named `Python_for_Data_Engineering_from_Scratch_Companion_v1.0.3.zip` and unzip it to a folder you can find again; that folder is the project directory referred to below. If you would rather browse the project or want the most recent source, the repository is a secondary path:
 
 ```text
 https://github.com/Mason-Ye-Project/python-data-engineering-from-scratch
 ```
 
-Prefer the versioned release when following the book: it is the 1.0.2 version the book's commands, outputs, and counts were verified against, so following along against it gives you the results shown in these pages.
+Prefer the versioned release when following the book: it is the 1.0.3 version the book's commands, outputs, and counts were verified against, so following along against it gives you the results shown in these pages.
 
 ## What you need
 
@@ -115,9 +115,9 @@ A passing suite is bounded evidence that the tested behaviors, on the tested inp
 
 ## Input structure the loader requires
 
-Both the standard-library example and the canonical `clean-orders` workflow call the same structural preflight before any business-rule cleaning runs. The header must be exactly the declared nine field names, in the declared order; a UTF-8 byte-order mark is not silently stripped and therefore does not satisfy that exact header contract. Every data record must then contain exactly nine fields: a record with too few or too many fields is a run-level structural failure, and the run stops with a clear message naming the offending logical record and its field count, rather than silently collapsing a missing cell or discarding an extra one. A physically empty line is not a logical CSV record and is ignored by both loaders. Both implementations therefore apply the same header, blank-line, and nine-field policies, so a file one accepts is a file the other accepts. This structural check is deliberately separate from, and earlier than, the per-record business rules that reject an individual row for a blank required value, an invalid format, or an unknown customer.
+Both the standard-library example and the canonical `clean-orders` workflow read the orders through one shared parser, `load_orders_csv_records`, which parses the file once with the standard library's strict CSV reader and returns the records both workflows clean; neither path reparses the orders with `DictReader` or `pandas.read_csv`. That single reader enforces the whole contract: it rejects an embedded NUL character and malformed or unclosed quoting, requires the header to be exactly the declared nine field names in the declared order, and does not silently strip a UTF-8 byte-order mark, so a BOM header fails the header check. A physically empty line after the header is skipped because it is not a logical CSV record, while a blank line before the header is rejected. Every data record must contain exactly nine fields; a record with too few or too many fields is a run-level structural failure, and the run stops with a clear message naming the offending logical record and its field count, rather than silently collapsing a missing cell or discarding an extra one. Because both workflows consume the records this one reader produced, a file it accepts is accepted for both and a file it rejects is rejected for both. This structural parsing is deliberately separate from, and earlier than, the per-record business rules that reject an individual row for a blank required value, an invalid format, or an unknown customer.
 
-The customer reference file is held to a matching standard: if it contains two customers with the same `customer_id`, the loader stops with a clear error naming the duplicate id rather than silently letting one overwrite the other. Both implementations reject duplicate customer ids the same way.
+The customer reference file is held to a matching standard by one shared strict JSON decoder. That decoder rejects a duplicate member name inside any single JSON object, at the top level or nested, so a customer object that repeats `customer_id`, or a `contact` object that repeats `city`, is a run-level reference-file failure rather than being silently resolved to the last value. This is distinct from, and earlier than, the duplicate-customer rule: after decoding, if two separate customer objects share the same `customer_id`, the loader still stops with a clear error naming the duplicate id rather than silently letting one overwrite the other. Both implementations decode the reference file the same strict way and reject both duplicate member names and duplicate customer ids.
 
 ## What the workflow writes
 
@@ -134,7 +134,7 @@ A content hash here is a short string computed from a file's exact bytes; it is 
 
 ## Raw data is never overwritten
 
-The two input files, `data/raw/orders.csv` and `data/raw/customers.json`, are the source of truth and are read only. Before writing anything, each workflow resolves every input path and every planned output path and stops with an `input/output path collision` error if any input would also be an output, including when a symbolic-link alias resolves to the same location. The canonical workflow also freezes both input hashes before it writes its first output. It therefore never writes over a raw input or records an output's replacement bytes as an input identity. If you delete the output directory, you can regenerate it by running the command again from the untouched raw files. If you want to experiment with the input, copy it somewhere else first and change the copy, leaving the raw files intact. Note that the cleaning transformations themselves (whitespace collapsing, uppercasing identifiers, lowercasing categories, two-decimal rounding) are one-way; what makes a cleaning decision recoverable is that the raw file is preserved, not that the transformation can be reversed.
+The two input files, `data/raw/orders.csv` and `data/raw/customers.json`, are the source of truth and are read only. Before writing anything, each workflow resolves every input path and every planned output path and refuses several kinds of alias: a direct input/output collision; a filesystem-identity alias, such as an output that is a hard link to a raw input, checked by identity rather than by comparing path text; a pre-existing output that is a symbolic link; and an output that aliases another output. Every resolved output must also stay inside the resolved output directory, and the manifest records the declared output names rather than whatever basename a resolved target might have. The canonical workflow also freezes both input hashes before it writes its first output. Together these checks stop the run before it could write over a raw input, write outside the output directory, or record an output's replacement bytes as an input identity. They guard against the alias patterns just described; they are not a promise of safety against every possible race or a filesystem that is changed by something else mid-run. If you delete the output directory, you can regenerate it by running the command again from the untouched raw files. If you want to experiment with the input, copy it somewhere else first and change the copy, leaving the raw files intact. Note that the cleaning transformations themselves (whitespace collapsing, uppercasing identifiers, lowercasing categories, two-decimal rounding) are one-way; what makes a cleaning decision recoverable is that the raw file is preserved, not that the transformation can be reversed.
 
 ## Reproducibility
 
@@ -148,6 +148,7 @@ Running the command twice on the same data and the same runtime produces byte-fo
 - **PowerShell blocks the activation script on Windows.** PowerShell's own documentation describes adjusting the execution policy to allow local scripts for your user account; follow that guidance and activate again.
 - **The counts are not 20, 9, and 11.** Confirm you are running against the unmodified raw files in `data/raw`, not an altered copy.
 - **The run stops complaining a record has the wrong number of fields.** That is the nine-field structural check. Look at the record number it names in `data/raw/orders.csv` and confirm the file has not been edited into a short or over-wide row.
+- **A run failed but old output files are still in the directory.** A failed run does not delete outputs from an earlier successful run, and the current implementation does not write outputs atomically. So after a failed run the error status is current while any files already in the output directory are stale, left over from the previous successful run. Use a fresh output directory or clear the old directory before investigating a new run, so you do not read an old clean file, report, or manifest as if it came from the run that just failed.
 
 ## Limitations
 
