@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 from pathlib import Path
 
-from messy_orders.input_contract import plan_safe_io_paths, validate_orders_csv_structure
+from messy_orders.input_contract import (
+    load_orders_csv_records,
+    load_strict_json,
+    plan_safe_io_paths,
+)
 from messy_orders.rules import (
     CLEAN_FIELDS,
     REJECT_FIELDS,
@@ -17,7 +20,7 @@ from messy_orders.rules import (
 
 
 def load_customers(path: Path) -> dict[str, dict[str, str]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = load_strict_json(path)
     if not isinstance(payload, list):
         raise ValueError("customers JSON must contain an array")
 
@@ -44,15 +47,7 @@ def load_customers(path: Path) -> dict[str, dict[str, str]]:
 
 
 def load_orders(path: Path) -> list[dict[str, object]]:
-    validate_orders_csv_structure(path)
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows: list[dict[str, object]] = []
-        # This is a logical CSV-record ordinal. The header occupies position 1.
-        for source_row, row in enumerate(reader, start=2):
-            row["source_row"] = source_row
-            rows.append(row)
-    return rows
+    return load_orders_csv_records(path)
 
 
 def write_rows(

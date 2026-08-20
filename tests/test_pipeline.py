@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -232,6 +233,75 @@ class PipelineTests(unittest.TestCase):
                 run_pipeline(orders_path, RAW_ROOT / "customers.json", output_dir)
 
             self.assertEqual(orders_path.read_bytes(), before)
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            orders_path = root / "orders.csv"
+            orders_path.write_bytes((RAW_ROOT / "orders.csv").read_bytes())
+            output_dir = root / "out"
+            output_dir.mkdir()
+            os.link(orders_path, output_dir / "orders_clean.csv")
+            before = orders_path.read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "input/output path collision"):
+                run_pipeline(orders_path, RAW_ROOT / "customers.json", output_dir)
+
+            self.assertEqual(orders_path.read_bytes(), before)
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            external = root / "external.txt"
+            external.write_text("must remain unchanged\n", encoding="utf-8")
+            (output_dir / "orders_clean.csv").symlink_to(external)
+
+            with self.assertRaisesRegex(ValueError, "must not be a symbolic link"):
+                run_pipeline(
+                    RAW_ROOT / "orders.csv",
+                    RAW_ROOT / "customers.json",
+                    output_dir,
+                )
+
+            self.assertEqual(external.read_text(encoding="utf-8"), "must remain unchanged\n")
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            external = root / "external.txt"
+            external.write_text("must remain unchanged\n", encoding="utf-8")
+            os.link(external, output_dir / "orders_clean.csv")
+
+            with self.assertRaisesRegex(ValueError, "must not be a hard link"):
+                run_pipeline(
+                    RAW_ROOT / "orders.csv",
+                    RAW_ROOT / "customers.json",
+                    output_dir,
+                )
+
+            self.assertEqual(external.read_text(encoding="utf-8"), "must remain unchanged\n")
+            self.assertFalse((output_dir / "run_manifest.json").exists())
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_dir = root / "out"
+            output_dir.mkdir()
+            clean_path = output_dir / "orders_clean.csv"
+            clean_path.write_text("old output\n", encoding="utf-8")
+            os.link(clean_path, output_dir / "orders_rejected.csv")
+
+            with self.assertRaisesRegex(ValueError, "output/output path collision"):
+                run_pipeline(
+                    RAW_ROOT / "orders.csv",
+                    RAW_ROOT / "customers.json",
+                    output_dir,
+                )
+
+            self.assertEqual(clean_path.read_text(encoding="utf-8"), "old output\n")
             self.assertFalse((output_dir / "run_manifest.json").exists())
 
     def test_customers_input_cannot_collide_with_report_output(self) -> None:
